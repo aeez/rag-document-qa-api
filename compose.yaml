@@ -1,0 +1,37 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: rag
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -U postgres -d rag"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      LLAMA_ARG_REPACK: "0"
+    volumes:
+      - models:/root/.ollama
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://postgres:localdev@db:5432/rag
+      OLLAMA_HOST: http://ollama:11434
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+volumes:
+  database:
+  models:
